@@ -5,6 +5,14 @@ using System.Security.Claims;
 using System.Xml;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using Org.BouncyCastle.Asn1.Sec;
+using System.Linq;
+using Org.BouncyCastle.Crypto.Generators;
+using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Security;
+using Org.BouncyCastle.Crypto.Parameters;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace JwtExample
 {
@@ -14,32 +22,29 @@ namespace JwtExample
         {
             var jwt = new JwtManager();
 
-            string token = jwt.GenerateJWTToken(1, "1@example.com");
+            var token = jwt.GenerateJWTTokenEcdsa(1, "123@123.ru");
 
-            bool isValid = jwt.CheckToken(token);
-        }        
+            bool isValid = jwt.CheckTokenEcdsa(token);
+
+            Console.WriteLine(isValid);
+        }
     }
 
     public class JwtManager
     {
-        private const string _privateKey = "<RSAKeyValue><Modulus>wCnmTiH/rFym9g2SSEn6f2pV6YQqFiV5ls3VqxUC3yeyk7UXFuEH/Kttbl2h4eOmXy7NCutmkyF+Mul5DeIs3X1jF6ZxTs3tIzBovV7lpIyQp9DUideSOy3jyu2pznP+l+XwkPwS5f4G43uFOTxU7KvXjJ8MLCNQ0TeY1wWVEkTX8JGEjv68dXEp8xOfMEDXkRYppEHy2g/FsDcqL+S33e/O5TQf2VSZpTH+COAz0nYwNs4RPuR6dpzOqeRhVMTVuOaAYYbzff15/bh1ytjXuZcuHsBUEe5zQnjV5iqIhzwtSw2p7jbIhOFq8DNUbOHKnLR1iI6tNXdz0NwMbTpLtw==</Modulus><Exponent>AQAB</Exponent><P>/23p95aUkenEzmgcH8+EIrkzotFVV15eRg7jtnY4rGbzZhY0mFMgnu1WGd0URFdY+D0QQEDI0+K68IlCYFMnZXPTX/4uD7cJtSfLKtTVc5kt1V6eE6r0nuGee1NImlVdokwtb1L/BMfco9wAm22NFCSm2f7RHWb8M2iNfxj/lbM=</P><Q>wJfNdK5AlVqCiFo1/iMhXiRrfry9Ri4WBg+G9kdelJh5rFYnFv4SGTeo/327pzaLSA59/idOTFG1wJjo9nnQZKfhVz3qPaq+OaThCU2d2YdMt1Kyl8VK4kziYf+9auem3J9WD5xiPPq4usDhuvhVKAJkjU6UkvTddrVUkvef9+0=</Q><DP>6vyvdjttyx8JE+rrlMhQg7FmM6/pl0sV59Xi4AW69cBww8ZB9LDlHdCymXCuKIFDNHzY6oOvPl8kJA3ipsNZRxhbqcApmAOIRsSpQGo1RPfzFozJWMa57UEbj9F6xaErVxhF5FiyjC9iaM0JMfSDCbj+Vyb6MtZ/xru1EOxqlck=</DP><DQ>NNoz3t5nCNWi1spy4MBBSvWRrmEbTCQflSAzuGhTk1HYqiumZI/q5ZK5xQt7MOMuC+M2PkYJHbaauzT7UZCSWN0dYPSz0KKHu4f83bG4LNcNfY2rRy00ZLAWvDATij/yMb9kPbp71yIzCcUe7VFzBRzK/WBgM4gRMp+GiyJ7eu0=</DQ><InverseQ>zDYpl2+9M4huyFY0L/WvZd7MYnYqEFMKIiRqTF2fUzT0mzCcLQcIb+a8LNkOIbIe199Zc64mdcjztMA0y2OW8Gsw2Twg6R2s1a3QNL7Fxsv9GE3JckLODcjJI8XprXwNxXu8HxFC/e6iG/urCvBAFAGlhGAlJ8qp3y3p9/oCDR8=</InverseQ><D>RSVOh8LYGw9jzJnpjzV/e6WpsFMsSbfGXqtGPT9cPywrp9a7rjHfC94rjFEI1R1zWkCe61T1HfApVuyH8KT3++MIaxQrJW4X7FeY+LtS6rjhvGD6eXcmWUET/Is0VOOMMuA8hg8ORc/4bpadw5CgBmF3OFRqrt8uT3ov9v89OssFqi48G0OHOZ+RLLQUazSgKAem00TI7xoIzpvEcALLyRlF9D39kB6Q4+5sNu4I8xOIPyBCH6TY24LARXwh++eeTDwD4wJDp1bk9Qsx/QQ8sQeKVrSc+0DWPrU1rsyuqWAL0LkI65Wt3fA7Zyd3oNEIU/I2+rau9Sc/0rT8j6Hm0Q==</D></RSAKeyValue>";
-        private const string _publicKey = "<RSAKeyValue><Modulus>wCnmTiH/rFym9g2SSEn6f2pV6YQqFiV5ls3VqxUC3yeyk7UXFuEH/Kttbl2h4eOmXy7NCutmkyF+Mul5DeIs3X1jF6ZxTs3tIzBovV7lpIyQp9DUideSOy3jyu2pznP+l+XwkPwS5f4G43uFOTxU7KvXjJ8MLCNQ0TeY1wWVEkTX8JGEjv68dXEp8xOfMEDXkRYppEHy2g/FsDcqL+S33e/O5TQf2VSZpTH+COAz0nYwNs4RPuR6dpzOqeRhVMTVuOaAYYbzff15/bh1ytjXuZcuHsBUEe5zQnjV5iqIhzwtSw2p7jbIhOFq8DNUbOHKnLR1iI6tNXdz0NwMbTpLtw==</Modulus><Exponent>AQAB</Exponent></RSAKeyValue>";
+        private const string _privateKeyEcdsa = "b046dda9f8105460075ff33e50fc9c3462331f7518435ae70252ed73facad881";
+        private const string _publicKeyEcdsa = "0426f7a6c1c733b91104be87c54c49765d0fcc8ba5551c694b56f8bebfd12b9f935f08aeced1292ad5c31dbbc60cc339e95ae7c414195d5d3dec325c894ceebc36";
+
         private const string _company = "Example";
 
-        public bool CheckToken(string jwt)
+        public bool CheckTokenEcdsa(string jwt)
         {
-            RsaSecurityKey publicKey;
-            using (var rsa = RSA.Create())
-            {
-                // rsa.FromXmlString(_publicKey); Not supported on Net Core
-                rsa.FromXML(_publicKey);
-                publicKey = new RsaSecurityKey(rsa);
-            }
+            var publicECDsa = Util.LoadPublicKey(Util.FromHexString(_publicKeyEcdsa));
             var prms = new TokenValidationParameters()
             {
                 RequireSignedTokens = true,
                 RequireExpirationTime = true,
-                IssuerSigningKey = publicKey,
+                IssuerSigningKey = new ECDsaSecurityKey(publicECDsa),
                 ValidateAudience = false,
                 ValidIssuer = _company
             };
@@ -57,20 +62,16 @@ namespace JwtExample
             }
         }
 
-        public string GenerateJWTToken(int id, string email)
+        public string GenerateJWTTokenEcdsa(int id, string email)
         {
-            RsaSecurityKey privateKey;
-            using (RSA privateRsa = RSA.Create())
-            {
-                // rsa.FromXmlString(_publicKey); Not supported on Net Core
-                privateRsa.FromXML(_privateKey);
-                privateKey = new RsaSecurityKey(privateRsa);
-            }
-            var credentials = new SigningCredentials(privateKey, SecurityAlgorithms.RsaSha256);
+            var privateECDsa = Util.LoadPrivateKey(Util.FromHexString(_privateKeyEcdsa));
+
+            var credentials = new SigningCredentials(
+                new ECDsaSecurityKey(privateECDsa), SecurityAlgorithms.EcdsaSha256);
 
             var header = new JwtHeader(credentials);
             var payload = new JwtPayload(
-                _company, 
+                _company,
                 email,
                 new List<Claim>()
                 {
@@ -89,36 +90,50 @@ namespace JwtExample
 
     public static class Util
     {
-        public static void FromXML(this RSA rsa, string xmlString)
+        public static byte[] FromHexString(string hex)
         {
-            var parameters = new RSAParameters();
+            var numberChars = hex.Length;
+            var hexAsBytes = new byte[numberChars / 2];
+            for (var i = 0; i < numberChars; i += 2)
+                hexAsBytes[i / 2] = Convert.ToByte(hex.Substring(i, 2), 16);
 
-            var xmlDoc = new XmlDocument();
-            xmlDoc.LoadXml(xmlString);
+            return hexAsBytes;
+        }
 
-            if (xmlDoc.DocumentElement.Name.Equals("RSAKeyValue"))
+        public static ECDsa LoadPublicKey(byte[] key)
+        {
+            var pubKeyX = key.Skip(1).Take(32).ToArray();
+            var pubKeyY = key.Skip(33).ToArray();
+
+            return ECDsa.Create(new ECParameters
             {
-                foreach (XmlNode node in xmlDoc.DocumentElement.ChildNodes)
+                Curve = ECCurve.NamedCurves.nistP256,
+                Q = new ECPoint
                 {
-                    switch (node.Name)
-                    {
-                        case "Modulus": parameters.Modulus = (string.IsNullOrEmpty(node.InnerText) ? null : Convert.FromBase64String(node.InnerText)); break;
-                        case "Exponent": parameters.Exponent = (string.IsNullOrEmpty(node.InnerText) ? null : Convert.FromBase64String(node.InnerText)); break;
-                        case "P": parameters.P = (string.IsNullOrEmpty(node.InnerText) ? null : Convert.FromBase64String(node.InnerText)); break;
-                        case "Q": parameters.Q = (string.IsNullOrEmpty(node.InnerText) ? null : Convert.FromBase64String(node.InnerText)); break;
-                        case "DP": parameters.DP = (string.IsNullOrEmpty(node.InnerText) ? null : Convert.FromBase64String(node.InnerText)); break;
-                        case "DQ": parameters.DQ = (string.IsNullOrEmpty(node.InnerText) ? null : Convert.FromBase64String(node.InnerText)); break;
-                        case "InverseQ": parameters.InverseQ = (string.IsNullOrEmpty(node.InnerText) ? null : Convert.FromBase64String(node.InnerText)); break;
-                        case "D": parameters.D = (string.IsNullOrEmpty(node.InnerText) ? null : Convert.FromBase64String(node.InnerText)); break;
-                    }
+                    X = pubKeyX,
+                    Y = pubKeyY
                 }
-            }
-            else
-            {
-                throw new Exception("Invalid XML RSA key.");
-            }
+            });
+        }
 
-            rsa.ImportParameters(parameters);
+        public static ECDsa LoadPrivateKey(byte[] key)
+        {
+            var privKeyInt = new Org.BouncyCastle.Math.BigInteger(+1, key);
+            var parameters = SecNamedCurves.GetByName("secp256r1");
+            var ecPoint = parameters.G.Multiply(privKeyInt);
+            var privKeyX = ecPoint.Normalize().XCoord.ToBigInteger().ToByteArrayUnsigned();
+            var privKeyY = ecPoint.Normalize().YCoord.ToBigInteger().ToByteArrayUnsigned();
+
+            return ECDsa.Create(new ECParameters
+            {
+                Curve = ECCurve.NamedCurves.nistP256,
+                D = privKeyInt.ToByteArrayUnsigned(),
+                Q = new ECPoint
+                {
+                    X = privKeyX,
+                    Y = privKeyY
+                }
+            });
         }
     }
 }
